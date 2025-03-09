@@ -219,6 +219,22 @@ struct MCTSNode
     }
 };
 
+// Function to find the move
+pair<int, int> findMove(const GameState &rootState, const GameState &childState)
+{
+    for (int i = 0; i < GameState::BOARD_SIZE; ++i)
+    {
+        for (int j = 0; j < GameState::BOARD_SIZE; ++j)
+        {
+            if (rootState.board[i][j] == 0 && childState.board[i][j] != 0)
+            {
+                return {i, j};
+            }
+        }
+    }
+    return {-1, -1};
+}
+
 // MCTS Algorithm Functions
 MCTSNode *select(MCTSNode *node)
 {
@@ -277,101 +293,57 @@ GameState monteCarloTreeSearch(const GameState &rootState, int maxIterations)
     }
 
     // Find best move (child with highest visit count)
-    MCTSNode *bestChild = nullptr;
-    int maxVisits = -1;
+    MCTSNode *bestNode = root->bestChild(false);
 
-    cout << "Move statistics:" << endl;
-    cout << setw(10) << "Row" << setw(10) << "Col" << setw(10) << "Visits" << setw(10) << "Win Rate" << endl;
+    pair<int, int> move = findMove(root->state, bestNode->state);
+    cout << "MCTS selects move: (" << move.first << ", " << move.second << ")" << endl;
 
-    for (MCTSNode *child : root->children)
-    {
-        // Find the move coordinates by comparing boards
-        int moveRow = -1, moveCol = -1;
-        for (int i = 0; i < GameState::BOARD_SIZE; ++i)
-        {
-            for (int j = 0; j < GameState::BOARD_SIZE; ++j)
-            {
-                if (rootState.board[i][j] == 0 && child->state.board[i][j] != 0)
-                {
-                    moveRow = i;
-                    moveCol = j;
-                    break;
-                }
-            }
-            if (moveRow != -1)
-                break;
-        }
+    GameState resultState = bestNode->state;
 
-        double winRate = child->reward / child->visits;
-        cout << setw(10) << moveRow << setw(10) << moveCol
-             << setw(10) << child->visits
-             << setw(10) << fixed << setprecision(2) << (winRate + 1) / 2 * 100 << "%" << endl;
-
-        if (child->visits > maxVisits)
-        {
-            bestChild = child;
-            maxVisits = child->visits;
-        }
-    }
-
-    GameState bestMove = bestChild ? bestChild->state : rootState;
-
-    // Cleanup
+    // Clean up MCTS tree
     delete root;
 
-    return bestMove;
+    return resultState;
 }
 
 int main()
 {
-    srand(static_cast<unsigned>(time(0))); // Seed random number generator
-    GameState game;
-    int simulations = 10000; // Number of MCTS simulations per move
-    int player = 1;          // Human plays as X (player 1)
+    srand(static_cast<unsigned int>(time(nullptr))); // Seed for randomness
 
-    cout << "=== Tic-Tac-Toe with Monte Carlo Tree Search ===" << endl;
-    cout << "You are X, AI is O" << endl;
+    GameState state;
+    int maxIterations = 5000; // MCTS Iterations
 
-    while (!game.isTerminal())
+    while (!state.isTerminal())
     {
-        game.printBoard();
+        state.printBoard();
 
-        if (game.currentPlayer == player)
+        if (state.currentPlayer == 1)
         {
-            // Human's turn
+            cout << "Player 1 (X), enter your move (row and column): ";
             int row, col;
-            bool validMove = false;
-
-            while (!validMove)
+            cin >> row >> col;
+            if (!state.makeMove(row, col))
             {
-                cout << "Enter your move (row col): ";
-                cin >> row >> col;
-
-                validMove = game.makeMove(row, col);
-                if (!validMove)
-                    cout << "Invalid move. Try again." << endl;
+                cout << "Invalid move. Try again." << endl;
+                continue;
             }
         }
         else
         {
-            // AI's turn
-            cout << "AI is thinking..." << endl;
-            game = monteCarloTreeSearch(game, simulations);
-        }
-
-        // Check game result
-        if (game.isTerminal())
-        {
-            game.printBoard();
-            int result = game.getReward();
-            if (result == 0)
-                cout << "Game ended in a draw!" << endl;
-            else if ((result > 0 && player == 1) || (result < 0 && player == 2))
-                cout << "You win!" << endl;
-            else
-                cout << "AI wins!" << endl;
+            // Let MCTS find the best move for Player 2 (O)
+            state = monteCarloTreeSearch(state, maxIterations);
         }
     }
+
+    // Game over
+    state.printBoard();
+    int reward = state.getReward();
+    if (reward == 1)
+        cout << "Player 1 (X) wins!" << endl;
+    else if (reward == -1)
+        cout << "Player 2 (O) wins!" << endl;
+    else
+        cout << "It's a draw!" << endl;
 
     return 0;
 }
